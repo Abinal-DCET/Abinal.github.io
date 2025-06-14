@@ -2,7 +2,7 @@
 body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url('https://i.imgur.com/vH9Al4x.jpg') center/cover no-repeat fixed;
+      background-color: #1A1A1A; 
       color: #fff;
       min-height: 100vh;
     }
