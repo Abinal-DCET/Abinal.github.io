@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GamerGrounds</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="Web-Design.css">
+</head>
+<body>
+
+<header>
+  <div class="webname">
+    GamerGrounds
+  </div>
+  <nav>
+    <a href="#" id="navHome"><i class="fas fa-home"></i> Home</a>
+    <a href="#" id="navAllTournaments"><i class="fas fa-trophy"></i> All Tournaments</a>
+    <a href="#" id="navMyTournaments" style="display: none;"><i class="fas fa-list-ul"></i> My Tournaments</a>
+  </nav>
+  <div class="auth-buttons" id="authButtons"></div>
+</header>
+<main>
+    <div class="container" id="heroSection">
+      <div class="hero-box">
+        <h1>Welcome to GamerGrounds</h1>
+        <p>A local League of Legend Tournament Maker</p>
+        <button id="heroBrowseBtn"><i class="fas fa-trophy"></i> Browse Tournaments</button>
+        <button onclick="openModal('createTournament')" id="heroCreateBtn" style="display: none;"><i class="fas fa-plus"></i> Create Tournament</button>
+      </div>
+    </div>
+    <div class="featured">
+      <div class="list-header">
+        <h2 id="listTitle">All Tournaments</h2>
+        <div class="list-controls">
+            <select id="formatFilter">
+                <option value="all">All Formats</option>
+                <option value="single-elimination">Single Elimination</option>
+                <option value="double-elimination">Double Elimination</option>
+            </select>
+            <select id="statusFilter">
+                <option value="all">All Status</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search tournaments...">
+        </div>
+      </div>
+      <div class="tournaments" id="tournamentList"></div>
+      <a href="#" class="view-all-link" id="viewAllLink">View All Tournaments →</a>
+    </div>
+</main>
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <span class="close" onclick="closeModal('login')">×</span>
+    <h2>Login</h2>
+    <input type="text" id="loginUser" placeholder="Username">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <div class="link">Don't have an account? <a href="#" onclick="event.preventDefault(); switchModal('login','register')">Register Now</a></div>
+  </div>
+</div>
+<div class="modal-overlay" id="registerModal">
+  <div class="modal">
+    <span class="close" onclick="closeModal('register')">×</span>
+    <h2>Create Account</h2>
+    <input type="text" id="regUser" placeholder="Username" required>
+    <input type="password" id="regPass" placeholder="Password" required>
+    <input type="password" id="regPass2" placeholder="Confirm Password" required>
+    <input type="email" id="regEmail" placeholder="Email" required>
+    <button onclick="register()">Register</button>
+    <div class="link">Already have an account? <a href="#" onclick="event.preventDefault(); switchModal('register','login')">Login</a></div>
+  </div>
+</div>
+
+<div id="createTournamentModal" class="modal-overlay">
+  <div class="modal">
+    <span class="close" onclick="closeModal('createTournament')">×</span>
+    <h2>Create New Tournament</h2>
+    <form id="tournamentForm">
+      <input type="text" placeholder="Tournament Name" name="name" required>
+      <input type="text" value="Team Size: 5v5" disabled>
+      <input type="hidden" name="teamSize" value="5">
+      <input type="number" placeholder="Max Teams" name="maxTeams" min="2" max="10" required>
+      <select name="format" required>
+        <option value="" disabled selected>Tournament Format</option>
+        <option value="single-elimination">Single Elimination</option>
+        <option value="double-elimination">Double Elimination</option>
+      </select>
+      <label for="regDeadline">Registration Deadline:</label>
+      <input type="datetime-local" id="regDeadline" name="regDeadline" required>
+      <label for="startDate">Start Date:</label>
+      <input type="datetime-local" id="startDate" name="startDate" required>
+      <textarea name="description" placeholder="Description & Rules" rows="3"></textarea>
+      <button type="submit">Create Tournament</button>
+    </form>
+  </div>
+</div>
+
+<div id="tournamentDetailModal" class="modal-overlay">
+  <div class="modal">
+    <span class="close" onclick="closeModal('tournamentDetail')">×</span>
+    <h2 id="detailName">Tournament Name</h2>
+    <div class="detail-content">
+        <div class="detail-item"><strong>Format</strong><span id="detailFormat"></span></div>
+        <div class="detail-item"><strong>Team Size</strong><span id="detailTeamSize"></span></div>
+        <div class="detail-item"><strong>Registration Deadline</strong><span id="detailRegDeadline"></span></div>
+        <div class="detail-item"><strong>Start Date</strong><span id="detailStartDate"></span></div>
+        <div class="detail-item"><strong>Teams Registered</strong><span id="detailTeamsRegistered"></span></div>
+        <div class="detail-item"><strong>Created By</strong><span id="detailCreator"></span></div>
+        <div class="detail-item full-width"><strong>Description & Rules</strong><div id="detailDescription" class="detail-description-box"></div></div>
+
+        <h3 class="section-heading">Teams</h3>
+        <div id="detailTeamsList"><p>No teams registered yet.</p></div>
+
+        <div id="detailRegisterSection" class="full-width" style="display: none;">
+          <h3 class="section-heading">Register Your Team</h3>
+          <form id="registerTeamForm">
+            <input type="text" id="registerTeamName" placeholder="Team Name" required>
+            <input type="url" id="registerTeamLogo" placeholder="Team Logo Image URL (Optional)">
+            <input type="text" id="registerCaptainName" placeholder="Captain's Summoner Name" required>
+            <input type="email" id="registerContactEmail" placeholder="Contact Email" required>
+            <h4 style="color: #ccc; margin-top: 15px; margin-bottom: 5px; text-align: left; font-weight: normal;">Team Roster</h4>
+            <input type="text" id="registerTop" placeholder="Top Laner Summoner Name" required>
+            <input type="text" id="registerJungle" placeholder="Jungler Summoner Name" required>
+            <input type="text" id="registerMid" placeholder="Mid Laner Summoner Name" required>
+            <input type="text" id="registerBot" placeholder="Bot Laner Summoner Name" required>
+            <input type="text" id="registerSupport" placeholder="Support Summoner Name" required>
+            <button type="submit">Register Team</button>          
+          </form>
+        </div>
+        
+        <h3 class="section-heading">Bracket</h3>
+        <div id="bracketManagement" class="full-width"></div>
+        <div id="bracketDisplayArea" class="full-width">
+        </div>
+
+        <h3 class="section-heading">Tournament Standings</h3>
+        <div id="standingsContainer" class="full-width">
+            <p style="color: #bbb;">Standings will be available once matches have been played.</p>
+        </div>
+    </div>
+  </div>
+</div>
+
+<div id="scoreEntryModal" class="modal-overlay">
+  <div class="modal modal-sm">
+    <span class="close" onclick="closeModal('scoreEntry')">×</span>
+    <h2>Set Match Score</h2>
+    <form id="scoreEntryForm">
+        <label id="scoreTeam1Name"></label>
+        <span style="color:#888;">vs</span>
+        <label id="scoreTeam2Name"></label>
+        <input type="number" id="scoreTeam1" min="0" required>
+        <span style="color:#888;">-</span>
+        <input type="number" id="scoreTeam2" min="0" required>
+        <button type="submit" style="grid-column: 1 / -1;">Save Score</button>
+    </form>
+  </div>
+</div>
+
+
+<script src="Web-Functions.js"></script>
+</body>
+</html>
