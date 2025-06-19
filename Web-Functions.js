@@ -1,4 +1,3 @@
-// --- SETUP ---
 const DOM = {
     tournamentList: document.getElementById('tournamentList'),
     authButtons: document.getElementById('authButtons'),
@@ -16,7 +15,7 @@ const DOM = {
 let currentUser = localStorage.getItem('currentUser') || null;
 let currentView = 'home';
 
-// --- STORAGE & STATE HELPERS ---
+
 const getStorage = (key, fallback = []) => JSON.parse(localStorage.getItem(key)) || fallback;
 let tournaments = getStorage('tournaments');
 let sessionUsers = getStorage('sessionUsers', {});
@@ -27,7 +26,7 @@ const saveTournaments = (newTournaments) => {
     renderTournaments();
 };
 
-// --- HTML TEMPLATE HELPERS ---
+
 const teamLogoHTML = (team) => team?.logo
     ? `<img src="${team.logo}" alt="${team.name} Logo" class="bracket-team-logo">`
     : `<div class="bracket-team-logo-placeholder"><i class="fas fa-user-secret"></i></div>`;
@@ -39,7 +38,7 @@ const getTournamentStatus = (t) => {
     return finalMatch?.winner ? 'completed' : 'ongoing';
 };
 
-// --- RENDERING LOGIC ---
+
 function renderTournaments() {
     let source = (currentView === 'my' && currentUser)
         ? tournaments.filter(t => t.createdBy === currentUser)
@@ -125,7 +124,7 @@ function updateAuthUI() {
     }
 }
 
-// --- MODALS & AUTH ---
+
 const openModal = (id) => document.getElementById(id + 'Modal').classList.add('show');
 const closeModal = (id) => document.getElementById(id + 'Modal').classList.remove('show');
 const switchModal = (from, to) => { closeModal(from); openModal(to); };
@@ -158,7 +157,7 @@ function logout() {
     document.getElementById('navHome').click();
 }
 
-// --- FORM SUBMISSIONS ---
+
 DOM.tournamentForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!currentUser) return alert("You must be logged in.");
@@ -222,7 +221,7 @@ DOM.scoreEntryForm.addEventListener('submit', function (e) {
     showTournamentDetails(tIndex);
 });
 
-// --- BRACKET MANAGEMENT & LOGIC ---
+
 const createMatchObject = (id) => ({ id, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null });
 
 function generateBracket(index) {
@@ -300,7 +299,7 @@ function renderBracket(index) {
            <div class="bracket-section"><h4 class="bracket-heading">Grand Final</h4><div class="bracket-container">${renderRounds([{title:'', matches:[t.bracket.grandFinal]}], 'grandFinal')}</div></div>`;
 }
 
-// --- THIS IS THE CORRECTED FUNCTION ---
+
 function handleMatchResult(tIndex, type, rIndex, mIndex) {
     const t = tournaments[tIndex];
     if (!t.bracket || type === 'grandFinal') return;
@@ -308,7 +307,7 @@ function handleMatchResult(tIndex, type, rIndex, mIndex) {
     let match;
     if (type === 'lower') {
         match = t.bracket.lower[rIndex].matches[mIndex];
-    } else { // 'upper'
+    } else { 
         match = (t.format === 'single-elimination')
             ? t.bracket.rounds[rIndex].matches[mIndex]
             : t.bracket.upper[rIndex].matches[mIndex];
@@ -323,32 +322,32 @@ function handleMatchResult(tIndex, type, rIndex, mIndex) {
 
     if (type === 'upper') {
         const nextRound = (t.format === 'single-elimination' ? t.bracket.rounds : t.bracket.upper)[rIndex + 1];
-        if (nextRound) { // Advance winner in the upper bracket
+        if (nextRound) { 
             if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
             else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else if (t.format === 'double-elimination') { // Upper final winner goes to Grand Final
+        } else if (t.format === 'double-elimination') { 
             t.bracket.grandFinal.team1 = { ...winner };
         }
         
-        // CRITICAL FIX: Only run loser logic for double-elimination
+
         if (t.format === 'double-elimination' && loser.id !== 'BYE') { 
-            if (rIndex === 0) { // Losers from upper round 1
+            if (rIndex === 0) {
                 const lowerMatch = t.bracket.lower[0].matches[mIndex];
                 if (lowerMatch) {
                     if(isTopSlot) lowerMatch.team1 = { ...loser };
                     else lowerMatch.team2 = { ...loser };
                 }
-            } else { // Losers from subsequent upper rounds
+            } else { 
                 const lowerMatch = t.bracket.lower[(rIndex * 2) - 1].matches[mIndex];
                 if (lowerMatch) lowerMatch.team2 = { ...loser };
             }
         }
-    } else if (type === 'lower') { // Advance winner in lower bracket
+    } else if (type === 'lower') { 
         const nextRound = t.bracket.lower[rIndex + 1];
         if (nextRound) {
             if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
             else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else { // Lower final winner goes to Grand Final
+        } else { 
             t.bracket.grandFinal.team2 = { ...winner }; 
         }
     }
@@ -439,7 +438,7 @@ function openScoreModal(tIndex, bracketType, rIndex, mIndex) {
     document.getElementById('scoreTeam1').focus();
 }
 
-// --- INITIALIZATION ---
+
 document.addEventListener('DOMContentLoaded', () => {
     Object.assign(window, { openModal, closeModal, switchModal, showTournamentDetails, register, login, logout, generateBracket, resetBracket, deleteTournament, openScoreModal });
 
