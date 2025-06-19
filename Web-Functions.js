@@ -358,23 +358,39 @@ function renderStandings(index) {
     const t = tournaments[index];
     const container = document.getElementById('standingsContainer');
     const standings = {};
-    const gf = t.bracket?.grandFinal;
+    let finalMatch;
 
-    if (gf?.winner) {
-        standings['1st Place'] = gf.team1.id === gf.winner ? gf.team1.name : gf.team2.name;
-        standings['2nd Place'] = gf.team1.id === gf.loser ? gf.team1.name : gf.team2.name;
+    // Correctly identify the final match based on the tournament format
+    if (t.format === 'single-elimination') {
+        finalMatch = t.bracket?.rounds?.at(-1)?.matches[0];
+    } else if (t.format === 'double-elimination') {
+        finalMatch = t.bracket?.grandFinal;
+    }
+
+    // Now, check if the correctly identified final match has a winner
+    if (finalMatch?.winner) {
+        // 1st and 2nd place are the same for both formats
+        standings['1st Place'] = finalMatch.team1.id === finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
+        standings['2nd Place'] = finalMatch.team1.id === finalMatch.loser ? finalMatch.team1.name : finalMatch.team2.name;
+
+        // Calculate 3rd place differently based on format
         if (t.format === 'double-elimination') {
             const lowerFinal = t.bracket.lower.at(-1)?.matches[0];
-            if (lowerFinal?.loser) standings['3rd Place'] = lowerFinal.team1.id === lowerFinal.loser ? lowerFinal.team1.name : lowerFinal.team2.name;
-        } else {
-            const semiFinals = t.bracket.rounds.at(-2);
-            if(semiFinals) {
-                const losers = semiFinals.matches.map(m => m.team1.id === m.loser ? m.team1 : m.team2);
-                if (losers.length === 2) standings['3rd/4th Place'] = `${losers[0].name} & ${losers[1].name}`;
+            if (lowerFinal?.loser) {
+                standings['3rd Place'] = lowerFinal.team1.id === lowerFinal.loser ? lowerFinal.team1.name : lowerFinal.team2.name;
+            }
+        } else { // Single Elimination 3rd/4th place
+            const semiFinals = t.bracket.rounds.at(-2); // The round before the final
+            if (semiFinals) {
+                const losers = semiFinals.matches.map(m => (m.team1.id === m.loser ? m.team1 : m.team2));
+                if (losers.length === 2 && losers[0] && losers[1]) {
+                    standings['3rd/4th Place'] = `${losers[0].name} & ${losers[1].name}`;
+                }
             }
         }
     }
 
+    // Render the result
     if (Object.keys(standings).length > 0) {
         container.innerHTML = `<ul class="standings-list">${Object.entries(standings).map(([place, name]) => `<li><strong>${place}:</strong> ${name}</li>`).join('')}</ul>`;
     } else {
