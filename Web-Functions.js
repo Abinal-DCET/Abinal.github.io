@@ -1,3 +1,4 @@
+// --- SETUP ---
 const DOM = {
     tournamentList: document.getElementById('tournamentList'),
     authButtons: document.getElementById('authButtons'),
@@ -15,11 +16,10 @@ const DOM = {
 let currentUser = localStorage.getItem('currentUser') || null;
 let currentView = 'home';
 
-
+// --- STORAGE & STATE HELPERS ---
 const getStorage = (key, fallback = []) => JSON.parse(localStorage.getItem(key)) || fallback;
 let tournaments = getStorage('tournaments');
 let sessionUsers = getStorage('sessionUsers', {});
-
 
 const saveTournaments = (newTournaments) => {
     tournaments = newTournaments;
@@ -27,7 +27,7 @@ const saveTournaments = (newTournaments) => {
     renderTournaments();
 };
 
-
+// --- HTML TEMPLATE HELPERS ---
 const teamLogoHTML = (team) => team?.logo
     ? `<img src="${team.logo}" alt="${team.name} Logo" class="bracket-team-logo">`
     : `<div class="bracket-team-logo-placeholder"><i class="fas fa-user-secret"></i></div>`;
@@ -39,7 +39,7 @@ const getTournamentStatus = (t) => {
     return finalMatch?.winner ? 'completed' : 'ongoing';
 };
 
-
+// --- RENDERING LOGIC ---
 function renderTournaments() {
     let source = (currentView === 'my' && currentUser)
         ? tournaments.filter(t => t.createdBy === currentUser)
@@ -125,7 +125,7 @@ function updateAuthUI() {
     }
 }
 
-
+// --- MODALS & AUTH ---
 const openModal = (id) => document.getElementById(id + 'Modal').classList.add('show');
 const closeModal = (id) => document.getElementById(id + 'Modal').classList.remove('show');
 const switchModal = (from, to) => { closeModal(from); openModal(to); };
@@ -158,7 +158,7 @@ function logout() {
     document.getElementById('navHome').click();
 }
 
-
+// --- FORM SUBMISSIONS ---
 DOM.tournamentForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!currentUser) return alert("You must be logged in.");
@@ -175,7 +175,6 @@ DOM.registerTeamForm.addEventListener('submit', function (e) {
     e.preventDefault();
     const index = parseInt(this.dataset.tournamentIndex);
     const t = tournaments[index];
-    
     
     const newTeam = {
         id: `team_${Date.now()}`,
@@ -223,7 +222,7 @@ DOM.scoreEntryForm.addEventListener('submit', function (e) {
     showTournamentDetails(tIndex);
 });
 
-
+// --- BRACKET MANAGEMENT & LOGIC ---
 const createMatchObject = (id) => ({ id, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null });
 
 function generateBracket(index) {
@@ -301,12 +300,21 @@ function renderBracket(index) {
            <div class="bracket-section"><h4 class="bracket-heading">Grand Final</h4><div class="bracket-container">${renderRounds([{title:'', matches:[t.bracket.grandFinal]}], 'grandFinal')}</div></div>`;
 }
 
+// --- THIS IS THE CORRECTED FUNCTION ---
 function handleMatchResult(tIndex, type, rIndex, mIndex) {
     const t = tournaments[tIndex];
     if (!t.bracket || type === 'grandFinal') return;
+
     let match;
-    if(type === 'lower') match = t.bracket.lower[rIndex].matches[mIndex];
-    else match = (t.format === 'single-elimination') ? t.bracket.rounds[rIndex].matches[mIndex] : t.bracket.upper[rIndex].matches[mIndex];
+    if (type === 'lower') {
+        match = t.bracket.lower[rIndex].matches[mIndex];
+    } else { // 'upper'
+        match = (t.format === 'single-elimination')
+            ? t.bracket.rounds[rIndex].matches[mIndex]
+            : t.bracket.upper[rIndex].matches[mIndex];
+    }
+
+    if (!match?.winner) return;
 
     const winner = match.team1.id === match.winner ? match.team1 : match.team2;
     const loser = match.team1.id === match.loser ? match.team1 : match.team2;
@@ -315,24 +323,34 @@ function handleMatchResult(tIndex, type, rIndex, mIndex) {
 
     if (type === 'upper') {
         const nextRound = (t.format === 'single-elimination' ? t.bracket.rounds : t.bracket.upper)[rIndex + 1];
-        if (nextRound) { 
-            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner }; else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else if (t.format === 'double-elimination') t.bracket.grandFinal.team1 = { ...winner }; // Upper final winner
+        if (nextRound) { // Advance winner in the upper bracket
+            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
+            else nextRound.matches[nextMatchIdx].team2 = { ...winner };
+        } else if (t.format === 'double-elimination') { // Upper final winner goes to Grand Final
+            t.bracket.grandFinal.team1 = { ...winner };
+        }
         
+        // CRITICAL FIX: Only run loser logic for double-elimination
         if (t.format === 'double-elimination' && loser.id !== 'BYE') { 
-            if (rIndex === 0) { 
+            if (rIndex === 0) { // Losers from upper round 1
                 const lowerMatch = t.bracket.lower[0].matches[mIndex];
-                if (lowerMatch) lowerMatch.team1 = { ...loser };
-            } else { 
+                if (lowerMatch) {
+                    if(isTopSlot) lowerMatch.team1 = { ...loser };
+                    else lowerMatch.team2 = { ...loser };
+                }
+            } else { // Losers from subsequent upper rounds
                 const lowerMatch = t.bracket.lower[(rIndex * 2) - 1].matches[mIndex];
                 if (lowerMatch) lowerMatch.team2 = { ...loser };
             }
         }
-    } else if (type === 'lower') { 
+    } else if (type === 'lower') { // Advance winner in lower bracket
         const nextRound = t.bracket.lower[rIndex + 1];
         if (nextRound) {
-            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner }; else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else t.bracket.grandFinal.team2 = { ...winner }; 
+            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
+            else nextRound.matches[nextMatchIdx].team2 = { ...winner };
+        } else { // Lower final winner goes to Grand Final
+            t.bracket.grandFinal.team2 = { ...winner }; 
+        }
     }
 }
 
@@ -360,27 +378,23 @@ function renderStandings(index) {
     const standings = {};
     let finalMatch;
 
-    // Correctly identify the final match based on the tournament format
     if (t.format === 'single-elimination') {
         finalMatch = t.bracket?.rounds?.at(-1)?.matches[0];
     } else if (t.format === 'double-elimination') {
         finalMatch = t.bracket?.grandFinal;
     }
 
-    // Now, check if the correctly identified final match has a winner
     if (finalMatch?.winner) {
-        // 1st and 2nd place are the same for both formats
         standings['1st Place'] = finalMatch.team1.id === finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
         standings['2nd Place'] = finalMatch.team1.id === finalMatch.loser ? finalMatch.team1.name : finalMatch.team2.name;
 
-        // Calculate 3rd place differently based on format
         if (t.format === 'double-elimination') {
             const lowerFinal = t.bracket.lower.at(-1)?.matches[0];
             if (lowerFinal?.loser) {
                 standings['3rd Place'] = lowerFinal.team1.id === lowerFinal.loser ? lowerFinal.team1.name : lowerFinal.team2.name;
             }
-        } else { // Single Elimination 3rd/4th place
-            const semiFinals = t.bracket.rounds.at(-2); // The round before the final
+        } else {
+            const semiFinals = t.bracket.rounds.at(-2);
             if (semiFinals) {
                 const losers = semiFinals.matches.map(m => (m.team1.id === m.loser ? m.team1 : m.team2));
                 if (losers.length === 2 && losers[0] && losers[1]) {
@@ -390,7 +404,6 @@ function renderStandings(index) {
         }
     }
 
-    // Render the result
     if (Object.keys(standings).length > 0) {
         container.innerHTML = `<ul class="standings-list">${Object.entries(standings).map(([place, name]) => `<li><strong>${place}:</strong> ${name}</li>`).join('')}</ul>`;
     } else {
@@ -426,7 +439,7 @@ function openScoreModal(tIndex, bracketType, rIndex, mIndex) {
     document.getElementById('scoreTeam1').focus();
 }
 
-
+// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     Object.assign(window, { openModal, closeModal, switchModal, showTournamentDetails, register, login, logout, generateBracket, resetBracket, deleteTournament, openScoreModal });
 
