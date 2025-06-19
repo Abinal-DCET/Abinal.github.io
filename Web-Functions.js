@@ -1,118 +1,111 @@
-const tournamentListContainer = document.getElementById('tournamentList');
-const authButtonsContainer = document.getElementById('authButtons');
-const tournamentForm = document.getElementById('tournamentForm');
-const registerTeamForm = document.getElementById('registerTeamForm');
-const scoreEntryForm = document.getElementById('scoreEntryForm');
-const listTitle = document.getElementById('listTitle');
+const DOM = {
+    tournamentList: document.getElementById('tournamentList'),
+    authButtons: document.getElementById('authButtons'),
+    tournamentForm: document.getElementById('tournamentForm'),
+    registerTeamForm: document.getElementById('registerTeamForm'),
+    scoreEntryForm: document.getElementById('scoreEntryForm'),
+    listTitle: document.getElementById('listTitle'),
+    heroSection: document.getElementById('heroSection'),
+    listControls: document.querySelector('.list-controls'),
+    viewAllLink: document.getElementById('viewAllLink'),
+    navMyTournaments: document.getElementById('navMyTournaments'),
+    heroCreateBtn: document.getElementById('heroCreateBtn'),
+};
 
-let tournaments;
-try {
-    tournaments = JSON.parse(localStorage.getItem('tournaments')) || [];
-} catch (e) {
-    tournaments = [];
-}
-let sessionUsers = JSON.parse(localStorage.getItem('sessionUsers')) || {}; 
 let currentUser = localStorage.getItem('currentUser') || null;
 let currentView = 'home';
 
-function renderTournaments() {
-    tournamentListContainer.innerHTML = '';
-    
-    const isHomePage = (currentView === 'home');
 
-    let sourceTournaments = (currentView === 'my' && currentUser)
+const getStorage = (key, fallback = []) => JSON.parse(localStorage.getItem(key)) || fallback;
+let tournaments = getStorage('tournaments');
+let sessionUsers = getStorage('sessionUsers', {});
+
+
+const saveTournaments = (newTournaments) => {
+    tournaments = newTournaments;
+    localStorage.setItem('tournaments', JSON.stringify(tournaments));
+    renderTournaments();
+};
+
+
+const teamLogoHTML = (team) => team?.logo
+    ? `<img src="${team.logo}" alt="${team.name} Logo" class="bracket-team-logo">`
+    : `<div class="bracket-team-logo-placeholder"><i class="fas fa-user-secret"></i></div>`;
+
+const getTournamentStatus = (t) => {
+    const finalMatch = t.format === 'single-elimination'
+        ? t.bracket?.rounds.at(-1)?.matches[0]
+        : t.bracket?.grandFinal;
+    return finalMatch?.winner ? 'completed' : 'ongoing';
+};
+
+
+function renderTournaments() {
+    let source = (currentView === 'my' && currentUser)
         ? tournaments.filter(t => t.createdBy === currentUser)
         : tournaments;
 
-    let tournamentsToDisplay;
+    const filters = {
+        search: document.getElementById('searchInput').value.toLowerCase(),
+        format: document.getElementById('formatFilter').value,
+        status: document.getElementById('statusFilter').value,
+    };
 
-    if (isHomePage) {
-        tournamentsToDisplay = sourceTournaments.slice(0, 4);
-    } else {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const formatFilter = document.getElementById('formatFilter').value;
-        const statusFilter = document.getElementById('statusFilter').value;
+    let filtered = (currentView === 'home') ? source.slice(0, 4) : source.filter(t =>
+        t.name.toLowerCase().includes(filters.search) &&
+        (filters.format === 'all' || t.format === filters.format) &&
+        (filters.status === 'all' || getTournamentStatus(t) === filters.status)
+    );
 
-        tournamentsToDisplay = sourceTournaments.filter(t => {
-            const nameMatch = t.name.toLowerCase().includes(searchTerm);
-            const formatMatch = (formatFilter === 'all' || t.format === formatFilter);
-            
-            let statusMatch = true;
-            if (statusFilter !== 'all') {
-                const finalMatch = t.format === 'single-elimination' 
-                    ? t.bracket?.rounds[t.bracket.rounds.length - 1]?.matches[0]
-                    : t.bracket?.grandFinal;
-                const currentStatus = !!finalMatch?.winner ? 'completed' : 'ongoing';
-                statusMatch = (currentStatus === statusFilter);
-            }
-            return nameMatch && formatMatch && statusMatch;
-        });
-    }
-
-    if (tournamentsToDisplay.length === 0) {
-        tournamentListContainer.innerHTML = "<p style='color:#bbb; text-align: left; grid-column: 1 / -1;'>No tournaments available.</p>";
+    if (filtered.length === 0) {
+        DOM.tournamentList.innerHTML = "<p style='color:#bbb; text-align: left;'>No tournaments found.</p>";
         return;
     }
-    
-    tournamentsToDisplay.forEach(t => {
-      const originalIndex = tournaments.findIndex(originalT => originalT.id === t.id);
-      if (originalIndex === -1) return;
-      const card = document.createElement('div');
-      card.className = 'tournament-card';
-      card.setAttribute('onclick', `showTournamentDetails(${originalIndex})`);
-      
-      const finalMatch = t.format === 'single-elimination' 
-            ? t.bracket?.rounds[t.bracket.rounds.length - 1]?.matches[0]
-            : t.bracket?.grandFinal;
-      const status = finalMatch?.winner ? 'completed' : 'ongoing';
-      card.innerHTML = `
-          <div class="status-tag">${status}</div>
-          <div class="tournament-title">${t.name}</div>
-          <div class="meta">
-            ${t.format.replace('-', ' ')} | Teams: ${(t.teams || []).length}/${t.maxTeams}
-          </div>
-          <p class="tournament-description">${t.description || 'No description.'}</p>
-      `;
-      tournamentListContainer.appendChild(card);
-    });
+
+    DOM.tournamentList.innerHTML = filtered.map(t => {
+        const originalIndex = tournaments.indexOf(t);
+        return `
+        <div class="tournament-card" onclick="showTournamentDetails(${originalIndex})">
+            <div class="status-tag">${getTournamentStatus(t)}</div>
+            <div class="tournament-title">${t.name}</div>
+            <div class="meta">${t.format.replace('-', ' ')} | Teams: ${t.teams?.length || 0}/${t.maxTeams}</div>
+            <p class="tournament-description">${t.description || 'No description.'}</p>
+        </div>`;
+    }).join('');
 }
 
 function showTournamentDetails(index) {
     const t = tournaments[index];
     if (!t) return;
-    
-    document.getElementById('tournamentDetailModal').dataset.currentIndex = index;
-    const now = new Date(), regDeadline = new Date(t.regDeadline);
 
-    document.getElementById('detailName').textContent = t.name;
-    document.getElementById('detailFormat').textContent = t.format.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    document.getElementById('detailTeamSize').textContent = `${t.teamSize}v${t.teamSize}`;
-    document.getElementById('detailRegDeadline').textContent = regDeadline.toLocaleString();
-    document.getElementById('detailStartDate').textContent = new Date(t.startDate).toLocaleString();
-    document.getElementById('detailCreator').textContent = t.createdBy || 'N/A';
-    document.getElementById('detailDescription').textContent = t.description || 'No description provided.';
-    
-    const teamsRegistered = t.teams ? t.teams.length : 0;
-    document.getElementById('detailTeamsRegistered').textContent = `${teamsRegistered} / ${t.maxTeams}`;
+    document.getElementById('tournamentDetailModal').dataset.currentIndex = index;
+
+    Object.entries({
+        'detailName': t.name,
+        'detailFormat': t.format.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        'detailTeamSize': `${t.teamSize}v${t.teamSize}`,
+        'detailRegDeadline': new Date(t.regDeadline).toLocaleString(),
+        'detailStartDate': new Date(t.startDate).toLocaleString(),
+        'detailCreator': t.createdBy || 'N/A',
+        'detailDescription': t.description || 'No description provided.',
+        'detailTeamsRegistered': `${t.teams?.length || 0} / ${t.maxTeams}`,
+    }).forEach(([id, value]) => document.getElementById(id).textContent = value);
 
     const teamsList = document.getElementById('detailTeamsList');
-    teamsList.innerHTML = '';
-    if (teamsRegistered > 0) {
-        t.teams.forEach(team => {
-            const logoHtml = team.logo ? `<img src="${team.logo}" alt="${team.teamName} Logo" class="team-list-logo">` : '';
-            const rosterHtml = team.roster ? `<ul class="roster-list"><li><strong>Top:</strong> ${team.roster.top}</li><li><strong>Jungle:</strong> ${team.roster.jungle}</li><li><strong>Mid:</strong> ${team.roster.mid}</li><li><strong>Bot:</strong> ${team.roster.bot}</li><li><strong>Support:</strong> ${team.roster.support}</li></ul>` : '';
-            const teamCard = document.createElement('div');
-            teamCard.className = 'team-roster-card';
-            teamCard.innerHTML = `<h4 class="team-roster-name">${logoHtml} ${team.teamName} <span class="captain-tag">(Captain: ${team.captainName})</span></h4>${rosterHtml}`;
-            teamsList.appendChild(teamCard);
-        });
-    } else {
-        teamsList.innerHTML = '<p>No teams registered yet.</p>';
-    }
-
-    const registerSection = document.getElementById('detailRegisterSection');
-    registerSection.style.display = (currentUser && now < regDeadline && teamsRegistered < t.maxTeams) ? 'block' : 'none';
-    if(registerSection.style.display === 'block') registerTeamForm.dataset.tournamentIndex = index;
+    teamsList.innerHTML = t.teams?.length
+        ? t.teams.map(team => `
+            <div class="team-roster-card">
+                <h4 class="team-roster-name">
+                    ${team.logo ? `<img src="${team.logo}" alt="${team.teamName} Logo" class="team-list-logo">` : `<div class="team-list-logo-placeholder"><i class="fas fa-user-secret"></i></div>`}
+                    ${team.teamName} <span class="captain-tag">(Captain: ${team.captainName})</span>
+                </h4>
+                <ul class="roster-list">${Object.entries(team.roster).map(([role, name]) => `<li><strong>${role.charAt(0).toUpperCase() + role.slice(1)}:</strong> ${name}</li>`).join('')}</ul>
+            </div>`).join('')
+        : '<p>No teams registered yet.</p>';
+    
+    const canRegister = currentUser && new Date() < new Date(t.regDeadline) && (t.teams?.length || 0) < t.maxTeams;
+    document.getElementById('detailRegisterSection').style.display = canRegister ? 'block' : 'none';
+    if (canRegister) DOM.registerTeamForm.dataset.tournamentIndex = index;
 
     renderBracketManagement(index);
     renderBracket(index);
@@ -121,508 +114,332 @@ function showTournamentDetails(index) {
 }
 
 function updateAuthUI() {
-    const myTournamentsLink = document.getElementById('navMyTournaments');
-    const heroCreateBtn = document.getElementById('heroCreateBtn');
     if (currentUser) {
-        authButtonsContainer.innerHTML = `<span>${currentUser}</span><button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`;
-        myTournamentsLink.style.display = 'inline';
-        if(heroCreateBtn) heroCreateBtn.style.display = 'inline-block';
+        DOM.authButtons.innerHTML = `<span>${currentUser}</span><button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`;
+        DOM.navMyTournaments.style.display = 'inline';
+        if (DOM.heroCreateBtn) DOM.heroCreateBtn.style.display = 'inline-block';
     } else {
-        authButtonsContainer.innerHTML = `<button onclick="openModal('login')">Login</button><button onclick="openModal('register')">Register</button>`;
-        myTournamentsLink.style.display = 'none';
-        if(heroCreateBtn) heroCreateBtn.style.display = 'none';
+        DOM.authButtons.innerHTML = `<button onclick="openModal('login')">Login</button><button onclick="openModal('register')">Register</button>`;
+        DOM.navMyTournaments.style.display = 'none';
+        if (DOM.heroCreateBtn) DOM.heroCreateBtn.style.display = 'none';
     }
 }
 
-function openModal(id) { document.getElementById(id + 'Modal').classList.add('show'); }
-function closeModal(id) { document.getElementById(id + 'Modal').classList.remove('show'); }
-function switchModal(from, to) { closeModal(from); openModal(to); }
+
+const openModal = (id) => document.getElementById(id + 'Modal').classList.add('show');
+const closeModal = (id) => document.getElementById(id + 'Modal').classList.remove('show');
+const switchModal = (from, to) => { closeModal(from); openModal(to); };
+
 function register() {
-    const user = document.getElementById('regUser').value.trim(), pass = document.getElementById('regPass').value, pass2 = document.getElementById('regPass2').value;
-    if (!user || !pass) return alert("Username and Password are required.");
-    if (pass !== pass2) return alert("Passwords do not match.");
+    const user = document.getElementById('regUser').value.trim();
+    const pass = document.getElementById('regPass').value;
+    if (!user || !pass || pass !== document.getElementById('regPass2').value) return alert("Invalid details. Check passwords match.");
     if (sessionUsers[user]) return alert("Username already exists.");
     sessionUsers[user] = { password: pass };
     localStorage.setItem('sessionUsers', JSON.stringify(sessionUsers));
-    alert("Registered successfully! You can now log in.");
+    alert("Registered successfully!");
     switchModal('register', 'login');
 }
+
 function login() {
-    const user = document.getElementById('loginUser').value.trim(), pass = document.getElementById('loginPass').value;
-    if (!sessionUsers[user] || sessionUsers[user].password !== pass) return alert("Invalid username or password.");
+    const user = document.getElementById('loginUser').value.trim();
+    if (sessionUsers[user]?.password !== document.getElementById('loginPass').value) return alert("Invalid username or password.");
     currentUser = user;
     localStorage.setItem('currentUser', currentUser);
     closeModal('login');
     updateAuthUI();
     renderTournaments();
 }
+
 function logout() {
     currentUser = null;
     localStorage.removeItem('currentUser');
     updateAuthUI();
     document.getElementById('navHome').click();
 }
-tournamentForm.addEventListener('submit', function (e) {
+
+
+DOM.tournamentForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!currentUser) return alert("You must be logged in to create a tournament.");
-    const formData = new FormData(e.target);
-    const newTournament = Object.fromEntries(formData.entries());
-    if (new Date(newTournament.startDate) <= new Date(newTournament.regDeadline)) return alert('Start Date must be after Registration Deadline.');
-    if (newTournament.format === 'double-elimination' && newTournament.maxTeams < 4) return alert('Double Elimination tournaments require at least 4 teams.');
-    newTournament.id = Date.now();
-    newTournament.createdBy = currentUser;
-    newTournament.teams = [];
-    newTournament.bracket = null;
-    tournaments.push(newTournament);
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    renderTournaments();
+    if (!currentUser) return alert("You must be logged in.");
+    const data = Object.fromEntries(new FormData(e.target));
+    if (new Date(data.startDate) <= new Date(data.regDeadline)) return alert('Start Date must be after Registration Deadline.');
+    if (data.format === 'double-elimination' && data.maxTeams < 4) return alert('Double Elimination requires at least 4 teams.');
+    
+    saveTournaments([...tournaments, { ...data, id: Date.now(), createdBy: currentUser, teams: [], bracket: null }]);
     closeModal('createTournament');
     e.target.reset();
 });
-registerTeamForm.addEventListener('submit', function(e) {
+
+DOM.registerTeamForm.addEventListener('submit', function (e) {
     e.preventDefault();
-    const index = parseInt(this.dataset.tournamentIndex, 10), t = tournaments[index];
-    if (!t) return alert("Error: Tournament not found.");
-    const newTeam = { 
-        id: 'team_' + Date.now(), 
-        teamName: document.getElementById('registerTeamName').value.trim(),
-        logo: document.getElementById('registerTeamLogo').value.trim(), 
-        captainName: document.getElementById('registerCaptainName').value.trim(), 
-        roster: { 
-            top: document.getElementById('registerTop').value.trim(), 
-            jungle: document.getElementById('registerJungle').value.trim(), 
-            mid: document.getElementById('registerMid').value.trim(), 
-            bot: document.getElementById('registerBot').value.trim(), 
-            support: document.getElementById('registerSupport').value.trim() 
-        } 
+    const index = parseInt(this.dataset.tournamentIndex);
+    const t = tournaments[index];
+    
+    
+    const newTeam = {
+        id: `team_${Date.now()}`,
+        teamName: document.getElementById('registerTeamName').value,
+        logo: document.getElementById('registerTeamLogo').value,
+        captainName: document.getElementById('registerCaptainName').value,
+        roster: {
+            top: document.getElementById('registerTop').value,
+            jungle: document.getElementById('registerJungle').value,
+            mid: document.getElementById('registerMid').value,
+            bot: document.getElementById('registerBot').value,
+            support: document.getElementById('registerSupport').value
+        }
     };
-    if(!newTeam.teamName || !newTeam.captainName || !newTeam.roster.top) return alert("Please fill all required team fields.");
-    if (!t.teams) t.teams = [];
+
+    if (Object.values(newTeam.roster).some(p => !p) || !newTeam.teamName || !newTeam.captainName) return alert("Please fill all required fields.");
+    
     t.teams.push(newTeam);
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    alert("Team registered successfully!");
+    saveTournaments([...tournaments]);
+    alert("Team registered!");
     e.target.reset();
     closeModal('tournamentDetail');
-    renderTournaments();
     showTournamentDetails(index);
 });
 
+DOM.scoreEntryForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const { tIndex, bracketType, rIndex, mIndex } = this.dataset;
+    const t = tournaments[tIndex];
+    let match;
+    if (bracketType === 'grandFinal') match = t.bracket.grandFinal;
+    else if (bracketType === 'lower') match = t.bracket.lower[rIndex].matches[mIndex];
+    else match = (t.format === 'single-elimination') ? t.bracket.rounds[rIndex].matches[mIndex] : t.bracket.upper[rIndex].matches[mIndex];
+
+    const s1 = parseInt(document.getElementById('scoreTeam1').value), s2 = parseInt(document.getElementById('scoreTeam2').value);
+    if (isNaN(s1) || isNaN(s2) || s1 === s2) return alert('Invalid scores.');
+    
+    match.score1 = s1; match.score2 = s2;
+    match.winner = s1 > s2 ? match.team1.id : match.team2.id;
+    match.loser = s1 < s2 ? match.team1.id : match.team2.id;
+    
+    handleMatchResult(parseInt(tIndex), bracketType, parseInt(rIndex), parseInt(mIndex));
+    saveTournaments([...tournaments]);
+    closeModal('scoreEntry');
+    showTournamentDetails(tIndex);
+});
+
+
+const createMatchObject = (id) => ({ id, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null });
+
+function generateBracket(index) {
+    const t = tournaments[index];
+    let teams = [...t.teams].sort(() => 0.5 - Math.random());
+    const bracketSize = 2 ** Math.ceil(Math.log2(teams.length));
+    const byes = bracketSize - teams.length;
+    let round1 = [];
+    let teamIdx = 0;
+
+    for (let i = 0; i < bracketSize / 2; i++) {
+        const match = createMatchObject(`r1_m${i}`);
+        match.team1 = { id: teams[teamIdx].id, name: teams[teamIdx].teamName, logo: teams[teamIdx].logo };
+        if (i < byes) {
+            match.team2 = { id: 'BYE', name: 'BYE', logo: null };
+            match.winner = match.team1.id;
+            teamIdx++;
+        } else {
+            match.team2 = { id: teams[teamIdx + 1].id, name: teams[teamIdx + 1].teamName, logo: teams[teamIdx + 1].logo };
+            teamIdx += 2;
+        }
+        round1.push(match);
+    }
+    
+    if (t.format === 'single-elimination') {
+        t.bracket = { rounds: [{ title: 'Round 1', matches: round1 }] };
+        for (let r = 2, matches = bracketSize / 4; matches >= 1; r++, matches /= 2) {
+            const title = matches === 1 ? 'Finals' : matches === 2 ? 'Semi-Finals' : `Round ${r}`;
+            t.bracket.rounds.push({ title, matches: Array.from({ length: matches }, (_, i) => createMatchObject(`r${r}_m${i}`)) });
+        }
+    } else { 
+        const upperRounds = [{ title: 'Upper Round 1', matches: round1 }];
+        for (let r = 2, matches = bracketSize / 4; matches >= 1; r++, matches /= 2) {
+            upperRounds.push({ title: `Upper Round ${r}`, matches: Array.from({ length: matches }, (_, i) => createMatchObject(`ur${r}_m${i}`)) });
+        }
+        const lowerRounds = [];
+        for (let i = 0; i < (upperRounds.length - 1) * 2; i++) {
+            const matchCount = Math.max(1, bracketSize / (2 ** (Math.floor(i / 2) + 2)));
+            lowerRounds.push({ title: `Lower Round ${i + 1}`, matches: Array.from({ length: matchCount }, (_, j) => createMatchObject(`lr${i+1}_m${j}`)) });
+        }
+        t.bracket = { upper: upperRounds, lower: lowerRounds, grandFinal: createMatchObject('gf_m1') };
+    }
+    
+    round1.forEach((match, i) => match.winner && handleMatchResult(index, 'upper', 0, i));
+    saveTournaments([...tournaments]);
+    showTournamentDetails(index);
+}
+
+function renderBracket(index) {
+    const t = tournaments[index];
+    const container = document.getElementById('bracketDisplayArea');
+    if (!t.bracket) {
+        container.innerHTML = `<p style="color: #bbb;">Bracket not generated yet.</p>`;
+        return;
+    }
+    
+    const renderRounds = (rounds, type) => rounds.map((r, rIdx) => `
+        <div class="round">
+            <div class="round-title">${r.title}</div>
+            ${r.matches.map((m, mIdx) => {
+                const canManage = currentUser === t.createdBy && m.team1 && m.team2 && m.team1.id !== 'BYE' && m.team2.id !== 'BYE' && !m.winner;
+                return `
+                <div class="match ${m.winner === m.team1?.id ? 'winner-top' : ''} ${m.winner === m.team2?.id ? 'winner-bottom' : ''}">
+                    <div class="team team-top">${teamLogoHTML(m.team1)}<span class="team-name">${m.team1?.name || 'TBD'}</span><span class="team-score">${m.score1 ?? '-'}</span></div>
+                    <div class="team team-bottom">${teamLogoHTML(m.team2)}<span class="team-name">${m.team2?.name || 'TBD'}</span><span class="team-score">${m.score2 ?? '-'}</span></div>
+                    ${canManage ? `<button class="set-score-btn" onclick="openScoreModal(${index},'${type}',${rIdx},${mIdx})"><i class="fas fa-edit"></i></button>` : ''}
+                </div>`;
+            }).join('')}
+        </div>`).join('');
+
+    container.innerHTML = (t.format === 'single-elimination')
+        ? `<div class="bracket-container">${renderRounds(t.bracket.rounds, 'upper')}</div>`
+        : `<div class="bracket-section"><h4 class="bracket-heading">Upper Bracket</h4><div class="bracket-container">${renderRounds(t.bracket.upper, 'upper')}</div></div>
+           <div class="bracket-section"><h4 class="bracket-heading">Lower Bracket</h4><div class="bracket-container">${renderRounds(t.bracket.lower, 'lower')}</div></div>
+           <div class="bracket-section"><h4 class="bracket-heading">Grand Final</h4><div class="bracket-container">${renderRounds([{title:'', matches:[t.bracket.grandFinal]}], 'grandFinal')}</div></div>`;
+}
+
+function handleMatchResult(tIndex, type, rIndex, mIndex) {
+    const t = tournaments[tIndex];
+    if (!t.bracket || type === 'grandFinal') return;
+    let match;
+    if(type === 'lower') match = t.bracket.lower[rIndex].matches[mIndex];
+    else match = (t.format === 'single-elimination') ? t.bracket.rounds[rIndex].matches[mIndex] : t.bracket.upper[rIndex].matches[mIndex];
+
+    const winner = match.team1.id === match.winner ? match.team1 : match.team2;
+    const loser = match.team1.id === match.loser ? match.team1 : match.team2;
+    const nextMatchIdx = Math.floor(mIndex / 2);
+    const isTopSlot = mIndex % 2 === 0;
+
+    if (type === 'upper') {
+        const nextRound = (t.format === 'single-elimination' ? t.bracket.rounds : t.bracket.upper)[rIndex + 1];
+        if (nextRound) { 
+            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner }; else nextRound.matches[nextMatchIdx].team2 = { ...winner };
+        } else if (t.format === 'double-elimination') t.bracket.grandFinal.team1 = { ...winner }; // Upper final winner
+        
+        if (t.format === 'double-elimination' && loser.id !== 'BYE') { 
+            if (rIndex === 0) { 
+                const lowerMatch = t.bracket.lower[0].matches[mIndex];
+                if (lowerMatch) lowerMatch.team1 = { ...loser };
+            } else { 
+                const lowerMatch = t.bracket.lower[(rIndex * 2) - 1].matches[mIndex];
+                if (lowerMatch) lowerMatch.team2 = { ...loser };
+            }
+        }
+    } else if (type === 'lower') { 
+        const nextRound = t.bracket.lower[rIndex + 1];
+        if (nextRound) {
+            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner }; else nextRound.matches[nextMatchIdx].team2 = { ...winner };
+        } else t.bracket.grandFinal.team2 = { ...winner }; 
+    }
+}
 
 function renderBracketManagement(index) {
     const t = tournaments[index];
     const container = document.getElementById('bracketManagement');
     container.innerHTML = '';
-    const canManage = currentUser && currentUser === t.createdBy;
-    if (!canManage) return;
+    if (currentUser !== t.createdBy) return;
+
+    let buttonsHTML = `<button class="delete-btn" onclick="deleteTournament(${index})">Delete Tournament</button>`;
     const regClosed = new Date() > new Date(t.regDeadline);
     const minTeams = t.format === 'double-elimination' ? 4 : 2;
-    if (!t.bracket && regClosed && t.teams.length >= minTeams) {
-        container.innerHTML += `<button onclick="generateBracket(${index})">Generate Bracket</button>`;
-    } else if (t.bracket) {
-        container.innerHTML += `<button onclick="if(confirm('Are you sure? This will delete the current bracket and all scores.')) { resetBracket(${index}) }">Reset Bracket</button>`;
-    }
-    container.innerHTML += `<button class="delete-btn" onclick="deleteTournament(${index})">Delete Tournament</button>`;
-}
 
-function deleteTournament(index) {
-    if (!confirm('Are you sure you want to permanently delete this tournament? This action cannot be undone.')) return;
-    tournaments.splice(index, 1);
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    closeModal('tournamentDetail');
-    renderTournaments();
-}
-
-function generateBracket(index) {
-    const t = tournaments[index];
-    if (t.format === 'single-elimination') {
-        generateSingleEliminationBracket(index);
-    } else if (t.format === 'double-elimination') {
-        generateDoubleEliminationBracket(index);
+    if (t.bracket) {
+        buttonsHTML += `<button onclick="if(confirm('Reset bracket?')) resetBracket(${index})">Reset Bracket</button>`;
+    } else if (regClosed && t.teams.length >= minTeams) {
+        buttonsHTML += `<button onclick="generateBracket(${index})">Generate Bracket</button>`;
     }
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    showTournamentDetails(index);
-}
-
-function resetBracket(index) {
-    tournaments[index].bracket = null;
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    showTournamentDetails(index);
-}
-
-function generateSingleEliminationBracket(index) {
-    const t = tournaments[index];
-    let teams = [...t.teams].sort(() => Math.random() - 0.5);
-    const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams.length)));
-    const byes = bracketSize - teams.length;
-    let round1 = [];
-    let teamIndex = 0;
-    for (let i = 0; i < bracketSize / 2; i++) {
-        const match = { id: `r1_m${i}`, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null };
-        const teamToPlace = { id: teams[teamIndex].id, name: teams[teamIndex].teamName, logo: teams[teamIndex].logo };
-        if (i < byes) {
-            match.team1 = teamToPlace;
-            match.team2 = { id: 'BYE', name: 'BYE', logo: null };
-            match.winner = match.team1.id;
-            match.loser = match.team2.id;
-            teamIndex++;
-        } else {
-            match.team1 = teamToPlace; teamIndex++;
-            match.team2 = { id: teams[teamIndex].id, name: teams[teamIndex].teamName, logo: teams[teamIndex].logo }; teamIndex++;
-        }
-        round1.push(match);
-    }
-    round1.sort(() => Math.random() - 0.5);
-    t.bracket = { rounds: [{ title: 'Round 1', matches: round1 }] };
-    let numMatchesInRound = bracketSize / 4;
-    let roundNum = 2;
-    while (numMatchesInRound >= 1) {
-        let nextRound = Array.from({ length: numMatchesInRound }, (_, i) => ({ id: `r${roundNum}_m${i}`, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null }));
-        let title = `Round ${roundNum}`;
-        if (numMatchesInRound === 1) title = 'Finals';
-        if (numMatchesInRound === 2) title = 'Semi-Finals';
-        t.bracket.rounds.push({ title: title, matches: nextRound });
-        numMatchesInRound /= 2;
-        roundNum++;
-    }
-    t.bracket.rounds[0].matches.forEach((match, matchIndex) => {
-        if (match.winner) handleMatchResult(index, 'upper', 0, matchIndex);
-    });
-}
-
-function generateDoubleEliminationBracket(index) {
-    const t = tournaments[index];
-    let teams = [...t.teams].sort(() => Math.random() - 0.5);
-    const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams.length)));
-    const upperRounds = [];
-    let upperRound1 = [];
-    const byes = bracketSize - teams.length;
-    let teamIndex = 0;
-    for (let i = 0; i < bracketSize / 2; i++) {
-        const match = { id: `ur1_m${i}`, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null };
-        const teamToPlace = { id: teams[teamIndex].id, name: teams[teamIndex].teamName, logo: teams[teamIndex].logo };
-        if (i < byes) {
-            match.team1 = teamToPlace;
-            match.team2 = { id: 'BYE', name: 'BYE', logo: null };
-            match.winner = match.team1.id;
-            match.loser = match.team2.id;
-            teamIndex++;
-        } else {
-            match.team1 = teamToPlace; teamIndex++;
-            match.team2 = { id: teams[teamIndex].id, name: teams[teamIndex].teamName, logo: teams[teamIndex].logo }; teamIndex++;
-        }
-        upperRound1.push(match);
-    }
-    upperRound1.sort(() => Math.random() - 0.5);
-    upperRounds.push({ title: 'Upper Round 1', matches: upperRound1 });
-    let numMatchesInRound = bracketSize / 4;
-    let roundNum = 2;
-    while (numMatchesInRound >= 1) {
-        let nextRound = Array.from({ length: numMatchesInRound }, (_, i) => ({ id: `ur${roundNum}_m${i}`, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null }));
-        let title = `Upper Round ${roundNum}`;
-        if (numMatchesInRound === 1) title = 'Upper Final';
-        upperRounds.push({ title: title, matches: nextRound });
-        numMatchesInRound /= 2;
-        roundNum++;
-    }
-    const lowerRounds = [];
-    const lowerRoundCount = (upperRounds.length - 1) * 2;
-    for (let i = 0; i < lowerRoundCount; i++) {
-        let title = `Lower Round ${i + 1}`;
-        let matchCount = (i % 2 === 0) ? (bracketSize / Math.pow(2, Math.floor(i / 2) + 2)) : (bracketSize / Math.pow(2, Math.floor(i / 2) + 2));
-        if (matchCount < 1) matchCount = 1;
-        if(i === lowerRoundCount - 1) title = 'Lower Final';
-        let matches = Array.from({ length: matchCount }, (_, j) => ({ id: `lr${i+1}_m${j}`, team1: null, team2: null, score1: null, score2: null, winner: null, loser: null }));
-        lowerRounds.push({ title, matches });
-    }
-    t.bracket = { upper: upperRounds, lower: lowerRounds, grandFinal: { id: 'gf_m1', team1: null, team2: null, score1: null, score2: null, winner: null, loser: null } };
-    t.bracket.upper[0].matches.forEach((match, matchIndex) => {
-        if (match.winner) handleMatchResult(index, 'upper', 0, matchIndex);
-    });
-}
-
-function renderBracket(index) {
-    const t = tournaments[index];
-    const displayArea = document.getElementById('bracketDisplayArea');
-    displayArea.innerHTML = '';
-    if (!t.bracket) {
-        displayArea.innerHTML = `<p style="color: #bbb;">Bracket will be generated when registration closes.</p>`;
-        return;
-    }
-    const renderRounds = (rounds, bracketType) => {
-        const container = document.createElement('div');
-        container.className = 'bracket-container';
-        rounds.forEach((round, rIndex) => {
-            const roundDiv = document.createElement('div');
-            roundDiv.className = 'round';
-            roundDiv.innerHTML = `<div class="round-title">${round.title}</div>`;
-            round.matches.forEach((match, mIndex) => {
-                roundDiv.appendChild(createMatchElement(index, match, bracketType, rIndex, mIndex));
-            });
-            container.appendChild(roundDiv);
-        });
-        return container;
-    };
-    if (t.format === 'single-elimination') {
-        displayArea.appendChild(renderRounds(t.bracket.rounds, 'upper'));
-    } else if (t.format === 'double-elimination') {
-        const upperSection = document.createElement('div');
-        upperSection.className = 'bracket-section';
-        upperSection.innerHTML = '<h4 class="bracket-heading">Upper Bracket</h4>';
-        upperSection.appendChild(renderRounds(t.bracket.upper, 'upper'));
-        displayArea.appendChild(upperSection);
-        const lowerSection = document.createElement('div');
-        lowerSection.className = 'bracket-section';
-        lowerSection.innerHTML = '<h4 class="bracket-heading">Lower Bracket</h4>';
-        lowerSection.appendChild(renderRounds(t.bracket.lower, 'lower'));
-        displayArea.appendChild(lowerSection);
-        const finalSection = document.createElement('div');
-        finalSection.className = 'bracket-section';
-        finalSection.innerHTML = '<h4 class="bracket-heading">Grand Final</h4>';
-        const finalContainer = document.createElement('div');
-        finalContainer.className = 'bracket-container';
-        const finalRoundDiv = document.createElement('div');
-        finalRoundDiv.className = 'round';
-        finalRoundDiv.appendChild(createMatchElement(index, t.bracket.grandFinal, 'grandFinal', 0, 0));
-        finalContainer.appendChild(finalRoundDiv);
-        finalSection.appendChild(finalContainer);
-        displayArea.appendChild(finalSection);
-    }
-}
-
-function createMatchElement(tIndex, match, bracketType, rIndex, mIndex) {
-    const t = tournaments[tIndex];
-    const matchDiv = document.createElement('div');
-    matchDiv.className = 'match';
-    if (match.winner === match.team1?.id) matchDiv.classList.add('winner-top');
-    if (match.winner === match.team2?.id) matchDiv.classList.add('winner-bottom');
-    const team1Logo = match.team1?.logo ? `<img src="${match.team1.logo}" class="bracket-team-logo" alt="">` : `<div class="bracket-team-logo-placeholder"></div>`;
-    const team2Logo = match.team2?.logo ? `<img src="${match.team2.logo}" class="bracket-team-logo" alt="">` : `<div class="bracket-team-logo-placeholder"></div>`;
-    const team1Name = match.team1 ? match.team1.name : 'TBD', team2Name = match.team2 ? match.team2.name : 'TBD';
-    const team1Score = match.score1 !== null ? match.score1 : '-', team2Score = match.score2 !== null ? match.score2 : '-';
-    matchDiv.innerHTML = `<div class="team team-top">${team1Logo}<span class="team-name ${team1Name === 'BYE' ? 'bye' : ''}">${team1Name}</span><span class="team-score">${team1Score}</span></div><div class="team team-bottom">${team2Logo}<span class="team-name ${team2Name === 'BYE' ? 'bye' : ''}">${team2Name}</span><span class="team-score">${team2Score}</span></div>`;
-    const canManage = currentUser && currentUser === t.createdBy;
-    if (canManage && match.team1 && match.team2 && team1Name !== 'BYE' && team2Name !== 'BYE' && !match.winner) {
-        const scoreBtn = document.createElement('button');
-        scoreBtn.className = 'set-score-btn';
-        scoreBtn.innerHTML = `<i class="fas fa-edit"></i>`;
-        scoreBtn.title = 'Set Score';
-        scoreBtn.onclick = () => openScoreModal(tIndex, bracketType, rIndex, mIndex);
-        matchDiv.appendChild(scoreBtn);
-    }
-    return matchDiv;
-}
-
-function openScoreModal(tIndex, bracketType, rIndex, mIndex) {
-    let match;
-    if (bracketType === 'upper') {
-        match = (tournaments[tIndex].format === 'single-elimination')
-            ? tournaments[tIndex].bracket.rounds[rIndex].matches[mIndex]
-            : tournaments[tIndex].bracket.upper[rIndex].matches[mIndex];
-    } else if (bracketType === 'lower') {
-        match = tournaments[tIndex].bracket.lower[rIndex].matches[mIndex];
-    } else if (bracketType === 'grandFinal') {
-        match = tournaments[tIndex].bracket.grandFinal;
-    }
-    scoreEntryForm.dataset.tIndex = tIndex;
-    scoreEntryForm.dataset.bracketType = bracketType;
-    scoreEntryForm.dataset.rIndex = rIndex;
-    scoreEntryForm.dataset.mIndex = mIndex;
-    document.getElementById('scoreTeam1Name').textContent = match.team1.name;
-    document.getElementById('scoreTeam2Name').textContent = match.team2.name;
-    scoreEntryForm.reset();
-    openModal('scoreEntry');
-    document.getElementById('scoreTeam1').focus();
-}
-
-scoreEntryForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const { tIndex, bracketType, rIndex, mIndex } = this.dataset;
-    let match;
-    if (bracketType === 'upper') {
-        match = (tournaments[tIndex].format === 'single-elimination')
-            ? tournaments[tIndex].bracket.rounds[rIndex].matches[mIndex]
-            : tournaments[tIndex].bracket.upper[rIndex].matches[mIndex];
-    } else if (bracketType === 'lower') {
-        match = tournaments[tIndex].bracket.lower[rIndex].matches[mIndex];
-    } else {
-        match = tournaments[tIndex].bracket.grandFinal;
-    }
-    const score1 = parseInt(document.getElementById('scoreTeam1').value, 10);
-    const score2 = parseInt(document.getElementById('scoreTeam2').value, 10);
-    if (isNaN(score1) || isNaN(score2) || score1 === score2) return alert('Please enter valid, non-tying scores.');
-    match.score1 = score1;
-    match.score2 = score2;
-    match.winner = score1 > score2 ? match.team1.id : match.team2.id;
-    match.loser = score1 < score2 ? match.team1.id : match.team2.id;
-    handleMatchResult(parseInt(tIndex), bracketType, parseInt(rIndex), parseInt(mIndex));
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-    closeModal('scoreEntry');
-    showTournamentDetails(tIndex);
-});
-
-function handleMatchResult(tIndex, bracketType, rIndex, mIndex) {
-    const t = tournaments[tIndex];
-    let match;
-    if (bracketType === 'upper') {
-        match = (t.format === 'single-elimination')
-            ? t.bracket.rounds[rIndex].matches[mIndex]
-            : t.bracket.upper[rIndex].matches[mIndex];
-    } else if (bracketType === 'lower') {
-        match = t.bracket.lower[rIndex].matches[mIndex];
-    } else if (bracketType === 'grandFinal') {
-        return;
-    }
-    if (!match || !match.winner) return;
-    const winner = match.team1.id === match.winner ? match.team1 : match.team2;
-    const loser = match.team1.id === match.loser ? match.team1 : match.team2;
-    if (t.format === 'single-elimination') {
-        const nextRoundIndex = rIndex + 1;
-        if (nextRoundIndex >= t.bracket.rounds.length) return;
-        const nextMatchIndex = Math.floor(mIndex / 2);
-        const nextMatch = t.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
-        if (mIndex % 2 === 0) nextMatch.team1 = { ...winner }; else nextMatch.team2 = { ...winner };
-    } else if (t.format === 'double-elimination') {
-        if (bracketType === 'upper') {
-            const nextRoundIndex = rIndex + 1;
-            if (nextRoundIndex >= t.bracket.upper.length) {
-                t.bracket.grandFinal.team1 = { ...winner };
-            } else {
-                const nextMatchIndex = Math.floor(mIndex / 2);
-                const nextMatch = t.bracket.upper[nextRoundIndex].matches[nextMatchIndex];
-                if (mIndex % 2 === 0) nextMatch.team1 = { ...winner }; else nextMatch.team2 = { ...winner };
-            }
-        } else if (bracketType === 'lower') {
-            const nextRoundIndex = rIndex + 1;
-            if (nextRoundIndex >= t.bracket.lower.length) {
-                t.bracket.grandFinal.team2 = { ...winner };
-            } else {
-                const nextMatchIndex = Math.floor(mIndex / 2);
-                const nextMatch = t.bracket.lower[nextRoundIndex].matches[nextMatchIndex];
-                if (mIndex % 2 === 0) nextMatch.team1 = { ...winner }; else nextMatch.team2 = { ...winner };
-            }
-        }
-        if (bracketType === 'upper' && loser && loser.id !== 'BYE') {
-            if (rIndex === 0) {
-                const lowerMatch = t.bracket.lower[0].matches[mIndex];
-                if (lowerMatch) lowerMatch.team1 = { ...loser };
-            } else {
-                const targetLowerRoundIndex = (rIndex * 2) - 1;
-                const lowerMatch = t.bracket.lower[targetLowerRoundIndex].matches[mIndex];
-                if(lowerMatch) lowerMatch.team2 = { ...loser };
-            }
-        }
-    }
+    container.innerHTML = buttonsHTML;
 }
 
 function renderStandings(index) {
     const t = tournaments[index];
     const container = document.getElementById('standingsContainer');
-    if (!t.bracket) {
-        container.innerHTML = `<p style="color: #bbb;">Standings will be available once matches have been played.</p>`;
-        return;
-    }
     const standings = {};
-    if (t.format === 'single-elimination') {
-        const finalMatch = t.bracket.rounds[t.bracket.rounds.length - 1].matches[0];
-        if(finalMatch.winner) {
-            standings['1st Place'] = finalMatch.team1.id === finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
-            standings['2nd Place'] = finalMatch.team1.id !== finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
-            if (t.bracket.rounds.length > 1) {
-                const semiFinal = t.bracket.rounds[t.bracket.rounds.length - 2];
-                if (semiFinal.matches[0] && semiFinal.matches[1]) {
-                    const s1Loser = semiFinal.matches[0].team1.id === finalMatch.team1.id ? semiFinal.matches[0].team2 : semiFinal.matches[0].team1;
-                    const s2Loser = semiFinal.matches[1].team1.id === finalMatch.team2.id ? semiFinal.matches[1].team2 : semiFinal.matches[1].team1;
-                    if(s1Loser && s2Loser) standings['3rd/4th Place'] = `${s1Loser.name} & ${s2Loser.name}`;
-                }
-            }
-        }
-    } else if (t.format === 'double-elimination') {
-        const finalMatch = t.bracket.grandFinal;
-        if(finalMatch.winner) {
-            standings['1st Place'] = finalMatch.team1.id === finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
-            standings['2nd Place'] = finalMatch.team1.id !== finalMatch.winner ? finalMatch.team1.name : finalMatch.team2.name;
-            const lowerFinal = t.bracket.lower[t.bracket.lower.length - 1].matches[0];
-            if (lowerFinal.loser) {
-                standings['3rd Place'] = lowerFinal.team1.id === lowerFinal.loser ? lowerFinal.team1.name : lowerFinal.team2.name;
+    const gf = t.bracket?.grandFinal;
+
+    if (gf?.winner) {
+        standings['1st Place'] = gf.team1.id === gf.winner ? gf.team1.name : gf.team2.name;
+        standings['2nd Place'] = gf.team1.id === gf.loser ? gf.team1.name : gf.team2.name;
+        if (t.format === 'double-elimination') {
+            const lowerFinal = t.bracket.lower.at(-1)?.matches[0];
+            if (lowerFinal?.loser) standings['3rd Place'] = lowerFinal.team1.id === lowerFinal.loser ? lowerFinal.team1.name : lowerFinal.team2.name;
+        } else {
+            const semiFinals = t.bracket.rounds.at(-2);
+            if(semiFinals) {
+                const losers = semiFinals.matches.map(m => m.team1.id === m.loser ? m.team1 : m.team2);
+                if (losers.length === 2) standings['3rd/4th Place'] = `${losers[0].name} & ${losers[1].name}`;
             }
         }
     }
+
     if (Object.keys(standings).length > 0) {
-        let html = '<ul class="standings-list">';
-        for (const place in standings) html += `<li><strong>${place}:</strong> ${standings[place]}</li>`;
-        html += '</ul>';
-        container.innerHTML = html;
+        container.innerHTML = `<ul class="standings-list">${Object.entries(standings).map(([place, name]) => `<li><strong>${place}:</strong> ${name}</li>`).join('')}</ul>`;
     } else {
-        container.innerHTML = `<p style="color: #bbb;">Tournament in progress...</p>`;
+        container.innerHTML = `<p style="color: #bbb;">Standings will be available after the tournament concludes.</p>`;
     }
 }
 
+function deleteTournament(index) {
+    if (!confirm('Permanently delete this tournament?')) return;
+    tournaments.splice(index, 1);
+    saveTournaments([...tournaments]);
+    closeModal('tournamentDetail');
+}
+
+function resetBracket(index) {
+    tournaments[index].bracket = null;
+    saveTournaments([...tournaments]);
+    showTournamentDetails(index);
+}
+
+function openScoreModal(tIndex, bracketType, rIndex, mIndex) {
+    let match;
+    const t = tournaments[tIndex];
+    if (bracketType === 'grandFinal') match = t.bracket.grandFinal;
+    else if (bracketType === 'lower') match = t.bracket.lower[rIndex].matches[mIndex];
+    else match = (t.format === 'single-elimination') ? t.bracket.rounds[rIndex].matches[mIndex] : t.bracket.upper[rIndex].matches[mIndex];
+    
+    Object.assign(DOM.scoreEntryForm.dataset, { tIndex, bracketType, rIndex, mIndex });
+    document.getElementById('scoreTeam1Name').textContent = match.team1.name;
+    document.getElementById('scoreTeam2Name').textContent = match.team2.name;
+    DOM.scoreEntryForm.reset();
+    openModal('scoreEntry');
+    document.getElementById('scoreTeam1').focus();
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
-    window.openModal = openModal; window.closeModal = closeModal; window.switchModal = switchModal;
-    window.showTournamentDetails = showTournamentDetails; window.register = register; window.login = login;
-    window.logout = logout; window.generateBracket = generateBracket; window.resetBracket = resetBracket;
-    window.openScoreModal = openScoreModal; window.deleteTournament = deleteTournament;
+    Object.assign(window, { openModal, closeModal, switchModal, showTournamentDetails, register, login, logout, generateBracket, resetBracket, deleteTournament, openScoreModal });
 
-    const heroSection = document.getElementById('heroSection');
-    const listControls = document.querySelector('.list-controls');
-    const viewAllLink = document.getElementById('viewAllLink');
-
-    function updateView() {
-        const isHomePage = currentView === 'home';
-
-        heroSection.style.display = isHomePage ? 'block' : 'none';
-        listControls.style.display = isHomePage ? 'none' : 'flex';
-        viewAllLink.style.display = isHomePage ? 'block' : 'none';
-
-        if (isHomePage) {
-            listTitle.textContent = 'Featured Tournaments';
-        } else if (currentView === 'my') {
-            listTitle.textContent = 'My Tournaments';
-        } else {
-            listTitle.textContent = 'All Tournaments';
-        }
-
+    const updateView = () => {
+        const isHome = currentView === 'home';
+        DOM.heroSection.style.display = isHome ? 'block' : 'none';
+        DOM.listControls.style.display = isHome ? 'none' : 'flex';
+        DOM.viewAllLink.style.display = isHome ? 'block' : 'none';
+        DOM.listTitle.textContent = isHome ? 'Featured' : (currentView === 'my' ? 'My' : 'All') + ' Tournaments';
         renderTournaments();
-    }
-    
-    document.getElementById('navHome').addEventListener('click', (e) => {
-        e.preventDefault();
-        currentView = 'home';
-        updateView();
-    });
-    document.getElementById('navAllTournaments').addEventListener('click', (e) => {
-        e.preventDefault();
-        currentView = 'all';
-        updateView();
-    });
-    document.getElementById('navMyTournaments').addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!currentUser) return;
-        currentView = 'my';
-        updateView();
-    });
-    
-    document.getElementById('heroBrowseBtn').addEventListener('click', () => {
-        currentView = 'all';
-        updateView();
-        document.querySelector('.featured').scrollIntoView({ behavior: 'smooth' });
-    });
-    viewAllLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        currentView = 'all';
-        updateView();
-        document.querySelector('.featured').scrollIntoView({ behavior: 'smooth' });
-    });
+    };
 
-    document.getElementById('searchInput').addEventListener('input', renderTournaments);
-    document.getElementById('formatFilter').addEventListener('change', renderTournaments);
-    document.getElementById('statusFilter').addEventListener('change', renderTournaments);
+    const setView = (view) => (e) => {
+        e.preventDefault();
+        currentView = view;
+        updateView();
+        if(view === 'all') document.querySelector('.featured').scrollIntoView({ behavior: 'smooth' });
+    };
+    
+    document.getElementById('navHome').addEventListener('click', setView('home'));
+    document.getElementById('navAllTournaments').addEventListener('click', setView('all'));
+    document.getElementById('navMyTournaments').addEventListener('click', (e) => { if (currentUser) setView('my')(e); });
+    document.getElementById('heroBrowseBtn').addEventListener('click', setView('all'));
+    document.getElementById('viewAllLink').addEventListener('click', setView('all'));
+
+    ['searchInput', 'formatFilter', 'statusFilter'].forEach(id => {
+        document.getElementById(id).addEventListener('input', renderTournaments);
+    });
 
     updateAuthUI();
     updateView();
 });
-
-
-// THINGS TO ADD 
-// FULLY DETAILED TEAM ROSTER
-// REGISTERD TEAMS AND RECORDS
