@@ -343,11 +343,14 @@ nav a:hover {
 .detail-content {
     text-align: left;
     display: grid;
+    
     grid-template-columns: 2fr 1fr;
     gap: 20px 30px;
 }
 .detail-item {
     margin-bottom: 5px;
+   
+    min-width: 0;
 }
 .detail-item.full-width {
     grid-column: 1 / -1;
@@ -359,6 +362,9 @@ nav a:hover {
 }
 .detail-item span {
     color: #ddd;
+    
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .detail-description-box {
     background: #111;
@@ -368,6 +374,9 @@ nav a:hover {
     margin-top: 5px;
     min-height: 60px;
     white-space: pre-wrap;
+    
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .section-heading {
     color: #C89B3C;
@@ -391,6 +400,8 @@ nav a:hover {
     border: 1px solid #444;
     border-radius: 5px;
     padding: 15px;
+    
+    min-width: 0;
 }
 .team-roster-name {
     margin: 0;
@@ -400,6 +411,9 @@ nav a:hover {
     display: flex;
     align-items: center;
     gap: 10px;
+    
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .captain-tag {
     color: #bbb;
@@ -417,6 +431,9 @@ nav a:hover {
     padding: 4px 0;
     font-size: 0.95em;
     color: #ddd;
+    /* Allow long player names to wrap */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .roster-list li strong {
     color: #C89B3C;
