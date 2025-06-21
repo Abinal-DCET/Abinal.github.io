@@ -343,8 +343,8 @@ nav a:hover {
 .detail-content {
     text-align: left;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px 30px;
 }
 .detail-item {
     margin-bottom: 5px;
