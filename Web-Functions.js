@@ -307,7 +307,7 @@ function handleMatchResult(tIndex, type, rIndex, mIndex) {
     let match;
     if (type === 'lower') {
         match = t.bracket.lower[rIndex].matches[mIndex];
-    } else { 
+    } else {
         match = (t.format === 'single-elimination')
             ? t.bracket.rounds[rIndex].matches[mIndex]
             : t.bracket.upper[rIndex].matches[mIndex];
@@ -322,33 +322,40 @@ function handleMatchResult(tIndex, type, rIndex, mIndex) {
 
     if (type === 'upper') {
         const nextRound = (t.format === 'single-elimination' ? t.bracket.rounds : t.bracket.upper)[rIndex + 1];
-        if (nextRound) { 
+        if (nextRound) {
             if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
             else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else if (t.format === 'double-elimination') { 
+        } else if (t.format === 'double-elimination') {
             t.bracket.grandFinal.team1 = { ...winner };
         }
-        
 
-        if (t.format === 'double-elimination' && loser.id !== 'BYE') { 
+        if (t.format === 'double-elimination' && loser.id !== 'BYE') {
             if (rIndex === 0) {
-                const lowerMatch = t.bracket.lower[0].matches[mIndex];
+                const lowerMatch = t.bracket.lower[0].matches[Math.floor(mIndex / 2)];
                 if (lowerMatch) {
-                    if(isTopSlot) lowerMatch.team1 = { ...loser };
+                    if (isTopSlot) lowerMatch.team1 = { ...loser };
                     else lowerMatch.team2 = { ...loser };
                 }
-            } else { 
+            } else {
                 const lowerMatch = t.bracket.lower[(rIndex * 2) - 1].matches[mIndex];
                 if (lowerMatch) lowerMatch.team2 = { ...loser };
             }
         }
-    } else if (type === 'lower') { 
+    } else if (type === 'lower') {
         const nextRound = t.bracket.lower[rIndex + 1];
         if (nextRound) {
-            if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
-            else nextRound.matches[nextMatchIdx].team2 = { ...winner };
-        } else { 
-            t.bracket.grandFinal.team2 = { ...winner }; 
+            // rIndex is even (0, 2, ...): Winners from this round await a drop-in. 1-to-1 advancement.
+            if (rIndex % 2 === 0) {
+                nextRound.matches[mIndex].team1 = { ...winner };
+            }
+            // rIndex is odd (1, 3, ...): Winners from this round play each other. 2-to-1 advancement.
+            else {
+                if (isTopSlot) nextRound.matches[nextMatchIdx].team1 = { ...winner };
+                else nextRound.matches[nextMatchIdx].team2 = { ...winner };
+            }
+        } else {
+            // Winner of the final lower bracket round goes to the Grand Final.
+            t.bracket.grandFinal.team2 = { ...winner };
         }
     }
 }
