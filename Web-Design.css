@@ -234,6 +234,8 @@ nav a:hover {
   margin-bottom: 0.5rem;
   color: #f5c045;
   padding-right: 80px;
+
+  overflow-wrap: break-word;
 }
 
 .meta {
@@ -291,6 +293,8 @@ nav a:hover {
   color: #C89B3C;
   text-align: center;
   margin-bottom: 20px;
+
+  overflow-wrap: break-word;
 }
 .modal input,
 .modal select,
@@ -343,13 +347,12 @@ nav a:hover {
 .detail-content {
     text-align: left;
     display: grid;
-    
     grid-template-columns: 2fr 1fr;
     gap: 20px 30px;
 }
 .detail-item {
     margin-bottom: 5px;
-   
+ 
     min-width: 0;
 }
 .detail-item.full-width {
@@ -362,8 +365,7 @@ nav a:hover {
 }
 .detail-item span {
     color: #ddd;
-    
-    word-wrap: break-word;
+    /* Ensures long, unbroken strings will wrap within the container */
     overflow-wrap: break-word;
 }
 .detail-description-box {
@@ -374,8 +376,7 @@ nav a:hover {
     margin-top: 5px;
     min-height: 60px;
     white-space: pre-wrap;
-    
-    word-wrap: break-word;
+   
     overflow-wrap: break-word;
 }
 .section-heading {
@@ -400,7 +401,7 @@ nav a:hover {
     border: 1px solid #444;
     border-radius: 5px;
     padding: 15px;
-    
+
     min-width: 0;
 }
 .team-roster-name {
@@ -411,8 +412,7 @@ nav a:hover {
     display: flex;
     align-items: center;
     gap: 10px;
-    
-    word-wrap: break-word;
+    /* Handles long team and captain names */
     overflow-wrap: break-word;
 }
 .captain-tag {
@@ -431,8 +431,7 @@ nav a:hover {
     padding: 4px 0;
     font-size: 0.95em;
     color: #ddd;
-    /* Allow long player names to wrap */
-    word-wrap: break-word;
+   
     overflow-wrap: break-word;
 }
 .roster-list li strong {
@@ -512,6 +511,8 @@ nav a:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  
+    min-width: 0;
 }
 .team-name.bye { color: #888; font-style: italic; }
 .team-score { font-weight: bold; color: #C89B3C; }
