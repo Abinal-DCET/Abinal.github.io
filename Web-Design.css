@@ -608,3 +608,8 @@ nav a:hover {
     border: 1px solid #C89B3C;
     object-fit: cover;
 }
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
