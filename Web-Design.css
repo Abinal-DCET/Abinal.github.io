@@ -1,6 +1,10 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
+  background-image: url('https://w0.peakpx.com/wallpaper/391/106/HD-wallpaper-league-of-legends-popular-game-league-of-legends-blue-logo-blue-carbon-fiber-background-league-of-legends-logo-lol-logo-league-of-legends-emblem.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   background-color: #1A1A1A; 
   color: #fff;
   min-height: 100vh;
